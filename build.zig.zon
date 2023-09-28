@@ -1,0 +1,11 @@
+.{
+	.name = "forte-bassh",
+	.version = "0.0.1",
+	.dependencies = .{
+		.mach_core = .{
+			.url = "https://pkg.machengine.org/mach-core/fd6694c9d9c35ac63bc3b49f895dbaf9a4fa7c3c.tar.gz",
+			.hash = "122004216dbfee1b07b2539ccdf803f104c49823db4625c718d4e4e3d769a00f7edc"
+		},
+	},
+}
+
