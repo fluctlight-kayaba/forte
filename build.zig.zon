@@ -4,7 +4,11 @@
 	.dependencies = .{
 		.mach_core = .{
 			.url = "https://pkg.machengine.org/mach-core/fd6694c9d9c35ac63bc3b49f895dbaf9a4fa7c3c.tar.gz",
-			.hash = "122004216dbfee1b07b2539ccdf803f104c49823db4625c718d4e4e3d769a00f7edc"
+			.hash = "122004216dbfee1b07b2539ccdf803f104c49823db4625c718d4e4e3d769a00f7edc",
+		},
+		.mach_freetype = .{
+			.url = "https://pkg.machengine.org/mach-freetype/92773615e2480c0a6f561748f2ba1180376bbb68.tar.gz",
+			.hash = "12205a6057fe43a4940c6db304449ebf3e98ff15d0eec05b75f621d7616c2e7d7f2c",
 		},
 	},
 }

@@ -10,13 +10,24 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
+    const mach_freetype_dep = b.dependency("mach_freetype", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
     const app = try mach_core.App.init(b, mach_core_dep.builder, .{
         .name = "forte",
         .src = "src/main.zig",
         .target = target,
         .optimize = optimize,
-        .deps = &[_]std.build.ModuleDependency{},
+        .deps = &[_]std.build.ModuleDependency{
+            .{ .name = "mach-freetype", .module = mach_freetype_dep.module("mach-freetype") },
+            .{ .name = "mach-harfbuzz", .module = mach_freetype_dep.module("mach-harfbuzz") },
+        },
     });
+
+    @import("mach_freetype").linkFreetype(mach_freetype_dep.builder, app.compile);
+    @import("mach_freetype").linkHarfbuzz(mach_freetype_dep.builder, app.compile);
     if (b.args) |args| app.run.addArgs(args);
 
     const run_step = b.step("run", "Run the app");
@@ -27,6 +38,7 @@ pub fn build(b: *std.Build) !void {
         .target = target,
         .optimize = optimize,
     });
+
     const run_unit_tests = b.addRunArtifact(unit_tests);
     const test_step = b.step("test", "Run unit tests");
     test_step.dependOn(&run_unit_tests.step);

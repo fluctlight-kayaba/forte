@@ -1,5 +1,7 @@
 const std = @import("std");
 const core = @import("mach-core");
+const freetype = @import("freetype");
+const path = @import("utils/font.zig");
 const gpu = core.gpu;
 
 pub const App = @This();
@@ -7,13 +9,25 @@ pub const App = @This();
 title_timer: core.Timer,
 pipeline: *gpu.RenderPipeline,
 
+const OutlinePrinter = struct {
+    library: freetype.library,
+    face: freetype.Face,
+    font_size: f32,
+};
+
 pub fn init(app: *App) !void {
+    var gpa = std.heap.GeneralPurposeAllocator(.{}){};
+    var allocator = gpa.allocator();
+
     try core.init(.{});
+    const font_dirs = try path.allocFontDirectories(&allocator);
+    defer allocator.free(font_dirs);
+
+    std.debug.print("Font path: {s} {s}", .{font_dirs});
 
     const shader_module = core.device.createShaderModuleWGSL("shader.wgsl", @embedFile("shader.wgsl"));
     defer shader_module.release();
 
-    // Fragment state
     const blend = gpu.BlendState{};
     const color_target = gpu.ColorTargetState{
         .format = core.descriptor.format,
