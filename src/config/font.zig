@@ -30,7 +30,10 @@ pub const Font = struct {
     weight: FontWeight,
     allocator: *std.mem.Allocator,
 
-    pub fn init(allocator: *std.mem.Allocator, name: []const u8, path: []const u8, weight: FontWeight) Font {
+    pub fn init(allocator: *std.mem.Allocator, name: []const u8, uri: []const u8, weight: FontWeight) !Font {
+        var path = try allocator.alloc(u8, uri.len + 1 + name.len);
+        _ = try std.fmt.bufPrint(path, "{s}/{s}", .{ uri, name });
+
         return Font{
             .name = name,
             .path = path,
@@ -76,6 +79,8 @@ const FontError = error{
 };
 
 pub fn findFont(allocator: *std.mem.Allocator, font: anytype) !Font {
+    var font_uri: ?[]const u8 = null;
+    var font_name: []const u8 = undefined;
     var system_font_dirs = try allocFontDirectories(allocator);
     defer allocator.free(system_font_dirs);
 
@@ -85,13 +90,20 @@ pub fn findFont(allocator: *std.mem.Allocator, font: anytype) !Font {
 
         while (try iterator.next()) |file| {
             if (helper.startsWith(file.name, font.name)) {
-                var path = try allocator.alloc(u8, uri.len + 1 + file.name.len);
-                _ = try std.fmt.bufPrint(path, "{s}/{s}", .{ uri, file.name });
-
-                return Font.init(allocator, file.name, path, .Medium);
+                font_uri = uri;
+                font_name = font.name;
+                break;
             }
+        }
+
+        if (font_uri == null) {
+            defer allocator.free(uri);
         }
     }
 
-    return FontError.FontNotFound;
+    if (font_uri) |uri| {
+        return Font.init(allocator, font_name, uri, .Medium);
+    } else {
+        return FontError.FontNotFound;
+    }
 }
