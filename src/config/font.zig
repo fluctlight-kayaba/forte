@@ -30,10 +30,7 @@ pub const Font = struct {
     weight: FontWeight,
     allocator: *std.mem.Allocator,
 
-    pub fn init(allocator: *std.mem.Allocator, name: []const u8, uri: []const u8, weight: FontWeight) !Font {
-        var path = try allocator.alloc(u8, uri.len + 1 + name.len);
-        _ = try std.fmt.bufPrint(path, "{s}/{s}", .{ uri, name });
-
+    pub fn init(allocator: *std.mem.Allocator, name: []const u8, path: []const u8, weight: FontWeight) Font {
         return Font{
             .name = name,
             .path = path,
@@ -57,8 +54,8 @@ pub fn allocFontDirectories(allocator: *std.mem.Allocator) ![][]const u8 {
             var home_font_path = try allocator.alloc(u8, home.len + "/Library/Fonts".len);
             _ = try std.fmt.bufPrint(home_font_path, "{s}/Library/Fonts", .{home});
             arr = try allocator.alloc([]const u8, 2);
-            arr[0] = home_font_path;
-            arr[1] = "/System/Library/Fonts";
+            arr[0] = "/System/Library/Fonts";
+            arr[1] = home_font_path;
         },
         .linux => {
             arr = try allocator.alloc([]const u8, 1);
@@ -79,8 +76,6 @@ const FontError = error{
 };
 
 pub fn findFont(allocator: *std.mem.Allocator, font: anytype) !Font {
-    var font_uri: ?[]const u8 = null;
-    var font_name: []const u8 = undefined;
     var system_font_dirs = try allocFontDirectories(allocator);
     defer allocator.free(system_font_dirs);
 
@@ -90,20 +85,13 @@ pub fn findFont(allocator: *std.mem.Allocator, font: anytype) !Font {
 
         while (try iterator.next()) |file| {
             if (helper.startsWith(file.name, font.name)) {
-                font_uri = uri;
-                font_name = font.name;
-                break;
+                var path = try allocator.alloc(u8, uri.len + 1 + file.name.len);
+                _ = try std.fmt.bufPrint(path, "{s}/{s}", .{ uri, file.name });
+
+                return Font.init(allocator, file.name, path, .Medium);
             }
         }
-
-        if (font_uri == null) {
-            defer allocator.free(uri);
-        }
     }
 
-    if (font_uri) |uri| {
-        return Font.init(allocator, font_name, uri, .Medium);
-    } else {
-        return FontError.FontNotFound;
-    }
+    return FontError.FontNotFound;
 }

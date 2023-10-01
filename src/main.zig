@@ -22,7 +22,19 @@ pub fn init(app: *App) !void {
 
     var ft = try font.findFont(&allocator, .{ .name = "OperatorMonoNerdFontMono-Medium" });
     defer ft.deinit();
-    std.debug.print("font: {s}", .{ft.path});
+
+    const font_file = try std.fs.openFileAbsolute(ft.path, .{});
+    defer font_file.close();
+    var buffer = try allocator.alloc(u8, try font_file.getEndPos());
+    defer allocator.free(buffer);
+    _ = try font_file.readAll(buffer);
+
+    std.debug.print("font: {s}\n", .{ft.path});
+    std.debug.print("First 10 bytes of the TTF file: ", .{});
+    for (buffer[0..10]) |byte| {
+        std.debug.print("{x} ", .{byte});
+    }
+    std.debug.print("\n", .{});
 
     const shader_module = core.device.createShaderModuleWGSL("shader.wgsl", @embedFile("shader.wgsl"));
     defer shader_module.release();
