@@ -1,7 +1,7 @@
 const std = @import("std");
 const core = @import("mach-core");
 const freetype = @import("freetype");
-const path = @import("utils/font.zig");
+const font = @import("config/font.zig");
 const gpu = core.gpu;
 
 pub const App = @This();
@@ -16,14 +16,13 @@ const OutlinePrinter = struct {
 };
 
 pub fn init(app: *App) !void {
+    try core.init(.{});
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpa.allocator();
 
-    try core.init(.{});
-    const font_dirs = try path.allocFontDirectories(&allocator);
-    defer allocator.free(font_dirs);
-
-    std.debug.print("Font path: {s} {s}", .{font_dirs});
+    var ft = try font.findFont(&allocator, .{ .name = "OperatorMonoNerdFontMono-Medium" });
+    defer ft.deinit();
+    std.debug.print("font: {s}", .{ft.path});
 
     const shader_module = core.device.createShaderModuleWGSL("shader.wgsl", @embedFile("shader.wgsl"));
     defer shader_module.release();
