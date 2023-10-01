@@ -25,13 +25,15 @@ pub const FontWeight = enum {
 };
 
 pub const Font = struct {
+    const Self = @This();
+
     path: []const u8,
     name: []const u8,
     weight: FontWeight,
     allocator: *std.mem.Allocator,
 
-    pub fn init(allocator: *std.mem.Allocator, name: []const u8, path: []const u8, weight: FontWeight) Font {
-        return Font{
+    pub fn init(allocator: *std.mem.Allocator, name: []const u8, path: []const u8, weight: FontWeight) Self {
+        return Self{
             .name = name,
             .path = path,
             .weight = weight,
@@ -39,7 +41,7 @@ pub const Font = struct {
         };
     }
 
-    pub fn deinit(self: *Font) void {
+    pub fn deinit(self: *Self) void {
         self.allocator.free(self.path);
     }
 };

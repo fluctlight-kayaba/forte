@@ -1,6 +1,6 @@
 const std = @import("std");
 const core = @import("mach-core");
-const freetype = @import("freetype");
+const freetype = @import("mach-freetype");
 const font = @import("config/font.zig");
 const gpu = core.gpu;
 
@@ -25,16 +25,20 @@ pub fn init(app: *App) !void {
 
     const font_file = try std.fs.openFileAbsolute(ft.path, .{});
     defer font_file.close();
-    var buffer = try allocator.alloc(u8, try font_file.getEndPos());
-    defer allocator.free(buffer);
-    _ = try font_file.readAll(buffer);
+    var font_buffer = try allocator.alloc(u8, try font_file.getEndPos());
+    defer allocator.free(font_buffer);
+    _ = try font_file.readAll(font_buffer);
 
     std.debug.print("font: {s}\n", .{ft.path});
     std.debug.print("First 10 bytes of the TTF file: ", .{});
-    for (buffer[0..10]) |byte| {
+    for (font_buffer[0..10]) |byte| {
         std.debug.print("{x} ", .{byte});
     }
     std.debug.print("\n", .{});
+
+    var lib = try freetype.Library.init();
+    var font_face = try lib.createFaceMemory(font_buffer, 0);
+    std.debug.print("font face: {any}\n", .{font_face});
 
     const shader_module = core.device.createShaderModuleWGSL("shader.wgsl", @embedFile("shader.wgsl"));
     defer shader_module.release();
