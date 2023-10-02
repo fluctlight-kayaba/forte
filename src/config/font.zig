@@ -1,5 +1,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
+const freetype = @import("mach-freetype");
 const helper = @import("../utils/helper.zig");
 
 pub fn FontDelta(comptime T: type) type {
@@ -14,35 +15,74 @@ pub fn FontDelta(comptime T: type) type {
     };
 }
 
-pub const FontWeight = enum {
-    ExtraLight,
-    Light,
-    Regular,
-    Medium,
-    Bold,
-    ExtraBold,
-    Black,
+pub const FontError = error{
+    FontNotFound,
 };
 
 pub const Font = struct {
     const Self = @This();
 
+    const Weight = enum {
+        ExtraLight,
+        Light,
+        Regular,
+        Medium,
+        Bold,
+        ExtraBold,
+        Black,
+    };
+
+    const InitOptions = struct {
+        name: []const u8,
+        weight: ?Weight = null,
+    };
+
     path: []const u8,
     name: []const u8,
-    weight: FontWeight,
+    file: std.fs.File,
+    file_buffer: []u8,
+    face: freetype.Face,
+    weight: Weight,
     allocator: *std.mem.Allocator,
 
-    pub fn init(allocator: *std.mem.Allocator, name: []const u8, path: []const u8, weight: FontWeight) Self {
-        return Self{
-            .name = name,
-            .path = path,
-            .weight = weight,
-            .allocator = allocator,
-        };
+    pub fn init(allocator: *std.mem.Allocator, options: InitOptions) !Self {
+        var system_font_dirs = try allocFontDirectories(allocator);
+        defer allocator.free(system_font_dirs);
+
+        for (system_font_dirs) |uri| {
+            var opern_dir = try std.fs.openIterableDirAbsolute(uri, .{});
+            var iterator = opern_dir.iterate();
+
+            while (try iterator.next()) |dir| {
+                if (helper.startsWith(dir.name, options.name)) {
+                    var path = try allocator.alloc(u8, uri.len + 1 + dir.name.len);
+                    _ = try std.fmt.bufPrint(path, "{s}/{s}", .{ uri, dir.name });
+                    const file = try std.fs.openFileAbsolute(path, .{});
+                    var buffer = try allocator.alloc(u8, try file.getEndPos());
+                    _ = try file.readAll(buffer);
+                    var lib = try freetype.Library.init();
+                    var face = try lib.createFaceMemory(buffer, 0);
+
+                    return Self{
+                        .name = options.name,
+                        .path = path,
+                        .file = file,
+                        .file_buffer = buffer,
+                        .face = face,
+                        .weight = options.weight orelse Weight.Regular,
+                        .allocator = allocator,
+                    };
+                }
+            }
+        }
+
+        return FontError.FontNotFound;
     }
 
     pub fn deinit(self: *Self) void {
         self.allocator.free(self.path);
+        self.allocator.free(self.file_buffer);
+        self.file.close();
     }
 };
 
@@ -71,29 +111,4 @@ pub fn allocFontDirectories(allocator: *std.mem.Allocator) ![][]const u8 {
     }
 
     return arr;
-}
-
-const FontError = error{
-    FontNotFound,
-};
-
-pub fn findFont(allocator: *std.mem.Allocator, font: anytype) !Font {
-    var system_font_dirs = try allocFontDirectories(allocator);
-    defer allocator.free(system_font_dirs);
-
-    for (system_font_dirs) |uri| {
-        var dir = try std.fs.openIterableDirAbsolute(uri, .{});
-        var iterator = dir.iterate();
-
-        while (try iterator.next()) |file| {
-            if (helper.startsWith(file.name, font.name)) {
-                var path = try allocator.alloc(u8, uri.len + 1 + file.name.len);
-                _ = try std.fmt.bufPrint(path, "{s}/{s}", .{ uri, file.name });
-
-                return Font.init(allocator, file.name, path, .Medium);
-            }
-        }
-    }
-
-    return FontError.FontNotFound;
 }

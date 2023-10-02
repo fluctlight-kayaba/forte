@@ -4,6 +4,7 @@ const freetype = @import("mach-freetype");
 const queue = @import("../utils/queue.zig");
 
 const Size = core.Size;
+const Font = @import("../config/font.zig").Font;
 const GlyphCache = queue.AutoHashMap(u32, GlyphInfo, 100);
 
 const Color = struct {
@@ -71,38 +72,49 @@ pub const GlyphInfo = struct {
 pub const Atlas = struct {
     const Self = @This();
 
+    const InitOptions = struct {
+        font: Font,
+        size: u8 = 15,
+    };
+
     size: u32,
     texture: [][]u8,
-    face: *freetype.Face,
+    font: Font,
     cache: GlyphCache,
     current_row: u32,
     row_baseline: u32,
     last_tallest_height: u32,
     row_remaining_width: u32,
 
-    pub fn init(allocator: *std.mem.Allocator, face: *freetype.Face, size: u32) Self {
-        var texture = try allocator.alloc([]Color, size);
+    pub fn init(allocator: *std.mem.Allocator, options: InitOptions) !Self {
+        var size = options.size;
+        var texture = try allocator.alloc([]u8, size);
         errdefer allocator.free(texture);
 
         for (texture) |*row| {
-            row.* = try allocator.alloc(Color, size);
+            row.* = try allocator.alloc(u8, size);
             errdefer allocator.free(row.*);
         }
 
         return Self{
             .size = size,
             .texture = texture,
-            .face = face,
-            .cache = GlyphCache.initCapacity(allocator, 2048),
+            .font = options.font,
+            .cache = try GlyphCache.initCapacity(allocator, 2048),
             .current_row = 0,
             .row_baseline = 0,
-            .row_tallest_height = 0,
+            .last_tallest_height = 0,
             .row_remaining_width = size,
         };
     }
 
+    pub fn deinit(self: *Self) void {
+        self.font.deinit();
+    }
+
     fn getOrPutGlyph(self: *Self, char: u32) void {
         const cached = self.cache.getOrPut(char);
+        const face = self.font.face;
 
         if (!cached.found_existing) {
             var glyph = GlyphInfo{
@@ -132,11 +144,11 @@ pub const Atlas = struct {
                 self.cache.delete(tail);
             }
 
-            try self.face.setPixelSizes(glyph.width, glyph.height);
-            try self.face.loadGlyph(char, .{});
-            try self.face.glyph().render(.normal);
+            try face.setPixelSizes(glyph.width, glyph.height);
+            try face.loadGlyph(char, .{});
+            try face.glyph().render(.normal);
 
-            if (self.face.glyph().bitmap().buffer()) |buffer| {
+            if (face.glyph().bitmap().buffer()) |buffer| {
                 var x: u8 = 0;
                 var y: u8 = 0;
                 while (y <= self.glyph_size.height) : (y += 1) {

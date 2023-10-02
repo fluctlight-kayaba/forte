@@ -1,55 +1,35 @@
 const std = @import("std");
 const core = @import("mach-core");
 const freetype = @import("mach-freetype");
-const font = @import("config/font.zig");
 const terminal = @import("renderer/terminal.zig");
 const primitive = @import("renderer/primitive.zig");
 const glyph = @import("renderer/glyph.zig");
 const gpu = core.gpu;
+
+const Atlas = glyph.Atlas;
+const TerminalGrid = terminal.Grid;
+const Font = @import("config/font.zig").Font;
 
 pub const App = @This();
 
 title_timer: core.Timer,
 pipeline: *gpu.RenderPipeline,
 
-const OutlinePrinter = struct {
-    library: freetype.library,
-    face: freetype.Face,
-    font_size: f32,
-};
-
-pub fn init(app: *App) !void {
+pub fn init(app: *App) anyerror!void {
     try core.init(.{});
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     var allocator = gpa.allocator();
+    var font = try Font.init(&allocator, .{ .name = "OperatorMonoNerdFontMono-Medium" });
+    var atlas = try Atlas.init(&allocator, .{ .font = font });
+    defer atlas.deinit();
 
-    var ft = try font.findFont(&allocator, .{ .name = "OperatorMonoNerdFontMono-Medium" });
-    defer ft.deinit();
-
-    const font_file = try std.fs.openFileAbsolute(ft.path, .{});
-    defer font_file.close();
-    var font_buffer = try allocator.alloc(u8, try font_file.getEndPos());
-    defer allocator.free(font_buffer);
-    _ = try font_file.readAll(font_buffer);
-
-    std.debug.print("font: {s}\n", .{ft.path});
-    std.debug.print("First 10 bytes of the TTF file: ", .{});
-    for (font_buffer[0..10]) |byte| {
-        std.debug.print("{x} ", .{byte});
-    }
-    std.debug.print("\n", .{});
-
-    var lib = try freetype.Library.init();
-    var font_face = try lib.createFaceMemory(font_buffer, 0);
-    std.debug.print("font face: {any}\n", .{font_face});
+    const cell_size = primitive.computeFontCellSize(&font.face);
+    const window_size = core.size();
 
     const shader_module = core.device.createShaderModuleWGSL("shader.wgsl", @embedFile("shader.wgsl"));
     defer shader_module.release();
 
-    const cell_size = primitive.computeFontCellSize(&font_face);
-    const window_size = core.size();
-
-    var grid = try terminal.Grid.init(&allocator, window_size, cell_size);
+    var grid = try TerminalGrid.init(&allocator, window_size, cell_size);
     std.debug.print("{d}:{d} <--", .{ grid.rows, grid.cols });
 
     grid.input_char('H');
