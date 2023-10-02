@@ -10,7 +10,7 @@ pub const Cell = struct {
     background: u32,
 };
 
-pub fn computeFontCellSize(face: freetype.Face) Size {
+pub fn computeFontCellSize(face: *freetype.Face) Size {
     return Size{
         .width = pixelFromI16(face.maxAdvanceWidth()),
         .height = pixelFromI16(face.maxAdvanceHeight()),
