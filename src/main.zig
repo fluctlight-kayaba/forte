@@ -2,6 +2,8 @@ const std = @import("std");
 const core = @import("mach-core");
 const freetype = @import("mach-freetype");
 const font = @import("config/font.zig");
+const terminal = @import("renderer/terminal.zig");
+const primitive = @import("renderer/primitive.zig");
 const gpu = core.gpu;
 
 pub const App = @This();
@@ -42,6 +44,17 @@ pub fn init(app: *App) !void {
 
     const shader_module = core.device.createShaderModuleWGSL("shader.wgsl", @embedFile("shader.wgsl"));
     defer shader_module.release();
+
+    const cell_size = primitive.computeFontCellSize(font_face);
+    const window_size = core.size();
+
+    var grid = try terminal.Grid.init(&allocator, window_size, cell_size);
+    std.debug.print("{d}:{d} <--", .{ grid.rows, grid.cols });
+    grid.input_char('H');
+    grid.input_char('e');
+    grid.input_char('l');
+    grid.input_char('l');
+    grid.input_char('o');
 
     const blend = gpu.BlendState{};
     const color_target = gpu.ColorTargetState{
