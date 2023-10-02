@@ -1,4 +1,7 @@
 const std = @import("std");
+const core = @import("mach-core");
+
+const Size = core.Size;
 
 const Color = struct {
     const Self = @This();
@@ -65,28 +68,54 @@ pub const GlyphInfo = struct {
 pub const Atlas = struct {
     const Self = @This();
 
+    size: u32,
     texture: [][]Color,
     glyphs: std.HashMap(u32, GlyphInfo),
+    current_row: u32,
+    row_baseline: u32,
+    last_tallest_height: u32,
+    row_remaining_width: u32,
 
-    pub fn init(allocator: *std.mem.Allocator, width: usize, height: usize) Self {
-        var texture = try allocator.alloc([]Color, height);
+    pub fn init(allocator: *std.mem.Allocator, size: u32) Self {
+        var texture = try allocator.alloc([]Color, size);
         errdefer allocator.free(texture);
 
         for (texture) |*row| {
-            row.* = try allocator.alloc(Color, width);
+            row.* = try allocator.alloc(Color, size);
             errdefer allocator.free(row.*);
         }
 
         var glyphs = std.HashMap(u32, GlyphInfo).init(allocator);
 
         return Self{
+            .size = size,
             .texture = texture,
             .glyphs = glyphs,
+            .current_row = 0,
+            .row_baseline = 0,
+            .row_tallest_height = 0,
+            .row_remaining_width = size,
         };
     }
 
     pub fn addGlyph(self: *Self, codePoint: u32, glyphInfo: GlyphInfo) void {
-        _ = self.glyphs.put(codePoint, glyphInfo) catch unreachable;
+        if (self.row_remaining_width >= glyphInfo.width) {
+            glyphInfo.x = self.row_remaining_width - glyphInfo.width;
+            glyphInfo.y = self.row_baseline;
+            _ = self.glyphs.put(codePoint, glyphInfo) catch unreachable;
+            self.row_remaining_width -= glyphInfo.width;
+        } else {
+            glyphInfo.x = 0;
+            glyphInfo.y = self.last_tallest_height;
+            self.current_row += 1;
+            self.row_remaining_width = self.size - glyphInfo.width;
+            self.row_baseline = self.last_tallest_height;
+            self.last_tallest_height = glyphInfo.height;
+        }
+
+        if (glyphInfo.height > self.last_tallest_height) {
+            self.last_tallest_height = glyphInfo.height;
+        }
     }
 
     pub fn getGlyph(self: *Self, codePoint: u32) GlyphInfo {
